@@ -116,6 +116,7 @@ class MainWindow(QWidget):
             ('Спутник', 'sat'),
             ('Гибрид', 'sat,skl')])
 
+
         self.setGeometry(100, 100, *SCREEN_SIZE)
         self.setWindowTitle('Отображение карты')
         self.image = QLabel(self)
