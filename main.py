@@ -4,7 +4,7 @@ from itertools import cycle
 
 import requests
 from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QTextEdit
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QLineEdit
 from PyQt5.QtCore import Qt
 
 # views settings
@@ -14,7 +14,7 @@ SPN = 0.5
 MAP_VIEW = 'map'
 #########################################
 
-MAP_SPN_COEFFICIENT = 0.05
+MAP_SPN_COEFFICIENT = 0.1
 MAP_CORDS_COEFFICIENT = 0.005
 
 MIN_SPN = 0
@@ -116,11 +116,12 @@ class MainWindow(QWidget):
             ('Спутник', 'sat'),
             ('Гибрид', 'sat,skl')])
 
-
         self.setGeometry(100, 100, *SCREEN_SIZE)
         self.setWindowTitle('Отображение карты')
         self.image = QLabel(self)
+
         self.pixmap = QPixmap()
+
         self.get_map()
         self.init_map()
 
@@ -131,17 +132,18 @@ class MainWindow(QWidget):
         self.btn_map_mode_change.clicked.connect(self.btn_map_mode_clicked)
         self.btn_map_mode_clicked()
 
-        self.search_phrase = QTextEdit(self)
-        self.search_phrase.resize(400, 23)
-        self.search_phrase.move(100, 451)
-        self.search_phrase.setPlaceholderText('Введите адрес для поиска')
-        self.search_phrase.setText('Москва')
-
         self.btn_search_submit = QPushButton(self)
         self.btn_search_submit.move(500, 450)
         self.btn_search_submit.resize(100, 25)
         self.btn_search_submit.setText('Поиск')
         self.btn_search_submit.clicked.connect(self.btn_search_submit_clicked)
+
+        self.search_phrase = QLineEdit(self)
+        self.search_phrase.resize(400, 23)
+        self.search_phrase.move(100, 451)
+        self.search_phrase.setPlaceholderText('Введите адрес для поиска')
+        self.search_phrase.setText('Москва')
+        self.search_phrase.returnPressed.connect(self.btn_search_submit.click)
 
     def get_map(self):
         params = {
@@ -166,6 +168,7 @@ class MainWindow(QWidget):
         self.image.move(0, 0)
         self.image.resize(600, 450)
         self.image.setPixmap(self.pixmap)
+        self.image.setFocus()
 
     def keyPressEvent(self, event):
         if event.key() in [Qt.Key_PageUp, Qt.Key_PageDown]:
@@ -178,7 +181,7 @@ class MainWindow(QWidget):
                 print('PgDOWN')
 
             spn = check_value(spn, MIN_SPN, MAX_SPN)
-            self.map_settings['spn'] = spn
+            self.map_settings['spn'] = round(spn, 4)
 
             cords_coefficient = spread_value_range_to_other_range(spn, MIN_SPN, MAX_SPN,
                                                                   MIN_CORDS_COEFFICIENT,
@@ -207,6 +210,7 @@ class MainWindow(QWidget):
             self.map_settings['cords'] = (x, y)
             # todo
             print('CORDS', f'({x}, {y})')
+
         self.get_map()
         self.init_map()
 
@@ -218,11 +222,12 @@ class MainWindow(QWidget):
         self.init_map()
 
     def btn_search_submit_clicked(self):
-        search_phrase = self.search_phrase.toPlainText()
+        search_phrase = self.search_phrase.text()
         if not search_phrase:
             self.map_settings['pt'] = ''
             self.get_map()
             self.init_map()
+
             return
         toponym = get_toponym_by_name(search_phrase)
         cords = get_cords_by_toponym(toponym)
