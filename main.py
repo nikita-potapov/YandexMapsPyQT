@@ -1,7 +1,7 @@
 import sys
 from pprint import pprint
 from itertools import cycle
-
+from math import exp
 import requests
 from PyQt5 import QtGui
 from PyQt5.QtGui import QPixmap
@@ -71,31 +71,27 @@ def get_toponym_by_name(name_to_find):
     return toponym
 
 
-def get_toponym_by_cords(pos, search_text=None, type_of_return='geo'):
-    x, y = pos
-    x = round(x, 6)
-    y = round(y, 6)
-    pos = (x, y)
-    search_params = {
-        "apikey": SEARCH_API_KEY,
-        'text': 'дом',
-        "lang": "ru_RU",
-        "ll": ','.join(list(map(str, pos))),
-        "type": type_of_return
+def get_toponym_by_cords(pos, kind=None):
+    if kind is None:
+        kind = 'house'
+    geocoder_params = {
+        "apikey": "40d1649f-0493-4b70-98ba-98533de7710b",
+        "kind": kind,
+        "geocode": "{},{}".format(*pos),
+        "format": "json"
     }
-    if search_text is not None:
-        search_params['text'] = search_text
+    response = requests.get(GEOCODER_API_URL, params=geocoder_params)
 
-    response = requests.get(SEARCH_API_SERVER_URL, params=search_params)
     if not response:
+        print("Ошибка выполнения запроса:")
+        print(response.request.url)
+        print("Http статус:", response.status_code, "(", response.reason, ")")
         return None
-    search_result = response.json()
-    if search_result.get('features', None) is None:
-        return None
-    if search_result['features']:
-        place = search_result['features'][0]
-        return place
-    return None
+
+    json_response = response.json()
+
+    data = json_response['response']['GeoObjectCollection']['featureMember']
+    pprint(data)
 
 
 def get_spn_size(toponym):
@@ -289,22 +285,8 @@ class MainWindow(QWidget):
             self.image.y() < y < self.image.y() + self.image.height():
             x -= self.image.x()
             y -= self.image.y()
-            width, height = self.image.width(), self.image.height()
-            image_c_x = width / 2
-            image_c_y = height / 2
-            c_x, c_y = self.map_settings['cords']
-            coef_x = abs(c_x / image_c_x)
-            coef_y = abs(c_y / image_c_y)
-
-            dx = x - image_c_x
-            dy = y - image_c_y
-
-            c_x += dx * coef_x
-            c_y += dy * coef_y
-
-            print(c_x, c_y)
-
-            pprint(get_toponym_by_cords((c_x, c_y)))
+            pos = self.get_gps_cords_by_program_cords((x, y))
+            toponym = get_toponym_by_cords(pos)
 
     def btn_map_mode_clicked(self):
         curr = next(self.map_mode)
@@ -355,6 +337,20 @@ class MainWindow(QWidget):
     def btn_show_index_clicked(self):
         self.is_index_show = not self.is_index_show
         self.show_current_toponym_address()
+
+    def get_gps_cords_by_program_cords(self, program_cords):
+        c_x, c_y = self.map_settings['cords']
+        x, y = program_cords
+        dx = c_x - x
+        dy = c_y - y
+
+        coef_cords = self.map_settings['spn'] / self.image.height()
+
+        new_x = c_x + dx * coef_cords
+        new_y = c_y + dy * coef_cords
+
+        gps_cords = (new_x, new_y)
+        return gps_cords
 
 
 if __name__ == '__main__':
