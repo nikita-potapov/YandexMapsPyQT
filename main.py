@@ -11,7 +11,7 @@ from PyQt5.QtCore import Qt
 # views settings
 #########################################
 CORDS = (48.403238, 54.314231)
-SPN = 0.5
+SPN = 0.005
 MAP_VIEW = 'map'
 #########################################
 
@@ -42,6 +42,27 @@ SEARCH_API_SERVER_URL = "https://search-maps.yandex.ru/v1/"
 SEARCH_API_KEY = "dda3ddba-c9ea-4ead-9010-f43fbc15c6e3"
 
 STATIC_MAPS_API_URL = "http://static-maps.yandex.ru/1.x/"
+
+import math
+
+
+def lonlat_distance(a, b):
+    degree_to_meters_factor = 111 * 1000  # 111 километров в метрах
+    a_lon, a_lat = a
+    b_lon, b_lat = b
+
+    # Берем среднюю по широте точку и считаем коэффициент для нее.
+    radians_lattitude = math.radians((a_lat + b_lat) / 2.)
+    lat_lon_factor = math.cos(radians_lattitude)
+
+    # Вычисляем смещения в метрах по вертикали и горизонтали.
+    dx = abs(a_lon - b_lon) * degree_to_meters_factor * lat_lon_factor
+    dy = abs(a_lat - b_lat) * degree_to_meters_factor
+
+    # Вычисляем расстояние между точками.
+    distance = math.sqrt(dx * dx + dy * dy)
+
+    return distance
 
 
 def get_toponym_by_name(name_to_find):
@@ -76,7 +97,7 @@ def get_toponym_by_cords(pos, kind=None):
         kind = 'house'
     geocoder_params = {
         "apikey": "40d1649f-0493-4b70-98ba-98533de7710b",
-        "kind": kind,
+        # "kind": kind,
         "geocode": "{},{}".format(*pos),
         "format": "json"
     }
@@ -89,9 +110,8 @@ def get_toponym_by_cords(pos, kind=None):
         return None
 
     json_response = response.json()
-
     data = json_response['response']['GeoObjectCollection']['featureMember']
-    pprint(data)
+    return data
 
 
 def get_spn_size(toponym):
@@ -282,11 +302,29 @@ class MainWindow(QWidget):
     def mousePressEvent(self, event: QtGui.QMouseEvent):
         x, y = event.x(), event.y()
         if self.image.x() < x < self.image.x() + self.image.width() and \
-            self.image.y() < y < self.image.y() + self.image.height():
+                self.image.y() < y < self.image.y() + self.image.height():
             x -= self.image.x()
             y -= self.image.y()
             pos = self.get_gps_cords_by_program_cords((x, y))
-            toponym = get_toponym_by_cords(pos)
+            toponyms = get_toponym_by_cords(pos)
+            toponyms = sorted(toponyms, key=lambda x: lonlat_distance(pos, tuple(
+                map(float, x['GeoObject']['Point']['pos'].split(' ')))))
+
+            # pprint(toponyms)
+
+            if not toponyms:
+                return
+            self.image.setFocus()
+            current_toponym = toponyms[0]['GeoObject']
+            self.current_search_result_toponym = current_toponym
+            self.show_current_toponym_address()
+            cords = get_cords_by_toponym(current_toponym)
+            if cords is not None:
+                # self.map_settings['cords'] = cords
+                # self.map_settings['spn'] = round(max(get_spn_size(current_toponym)), 4)
+                self.map_settings['pt'] = f'{cords[0]},{cords[1]},pm2rdm'
+                self.get_map()
+                self.init_map()
 
     def btn_map_mode_clicked(self):
         curr = next(self.map_mode)
@@ -311,7 +349,7 @@ class MainWindow(QWidget):
         cords = get_cords_by_toponym(current_toponym)
         if cords is not None:
             self.map_settings['cords'] = cords
-            self.map_settings['spn'] = round(max(get_spn_size(current_toponym)), 3)
+            self.map_settings['spn'] = round(max(get_spn_size(current_toponym)), 4)
             self.map_settings['pt'] = f'{cords[0]},{cords[1]},pm2rdm'
             self.get_map()
             self.init_map()
@@ -341,10 +379,10 @@ class MainWindow(QWidget):
     def get_gps_cords_by_program_cords(self, program_cords):
         c_x, c_y = self.map_settings['cords']
         x, y = program_cords
-        dx = c_x - x
-        dy = c_y - y
+        dx = x - (self.image.x() + self.image.width() / 2)
+        dy = - y + (self.image.y() + self.image.height() / 2)
 
-        coef_cords = self.map_settings['spn'] / self.image.height()
+        coef_cords = self.map_settings['spn'] / self.image.width()
 
         new_x = c_x + dx * coef_cords
         new_y = c_y + dy * coef_cords
