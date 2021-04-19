@@ -154,9 +154,6 @@ def check_value(value, min_value, max_value):
     return value
 
 
-def spread_value_range_to_other_range(value, in_min, in_max, out_min, out_max):
-    return (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
-
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -186,44 +183,6 @@ class MainWindow(QWidget):
         self.pixmap = QPixmap()
         self.get_map()
         self.init_map()
-
-        self.btn_map_mode_change = QPushButton(self)
-        self.btn_map_mode_change.move(0, 475)
-        self.btn_map_mode_change.resize(100, 25)
-        self.btn_map_mode_change.setText('')
-        self.btn_map_mode_change.clicked.connect(self.btn_map_mode_clicked)
-        self.btn_map_mode_clicked()
-
-        self.btn_search_submit = QPushButton(self)
-        self.btn_search_submit.move(500, 475)
-        self.btn_search_submit.resize(100, 25)
-        self.btn_search_submit.setText('Поиск')
-        self.btn_search_submit.clicked.connect(self.btn_search_submit_clicked)
-
-        self.btn_search_result_reset = QPushButton(self)
-        self.btn_search_result_reset.move(0, 0)
-        self.btn_search_result_reset.resize(150, 25)
-        self.btn_search_result_reset.setText('Сброс результата поиска')
-        self.btn_search_result_reset.clicked.connect(self.btn_search_result_reset_clicked)
-
-        self.search_phrase = QLineEdit(self)
-        self.search_phrase.resize(400, 23)
-        self.search_phrase.move(100, 476)
-        self.search_phrase.setPlaceholderText('Введите адрес для поиска')
-        self.search_phrase.setText('Москва')
-        self.search_phrase.returnPressed.connect(self.btn_search_submit_clicked)
-
-        self.search_result_address = QLineEdit(self)
-        self.search_result_address.resize(400, 23)
-        self.search_result_address.move(152, 1)
-        self.search_result_address.setPlaceholderText('Адрес найденного объекта')
-        self.search_result_address.setReadOnly(True)
-
-        self.btn_show_index = QPushButton(self)
-        self.btn_show_index.move(552, 0)
-        self.btn_show_index.resize(48, 25)
-        self.btn_show_index.setText('Индекс')
-        self.btn_show_index.clicked.connect(self.btn_show_index_clicked)
 
     def get_map(self):
         params = {
@@ -300,97 +259,6 @@ class MainWindow(QWidget):
             print('CORDS', f'({x}, {y})')
         self.get_map()
         self.init_map()
-
-    def mousePressEvent(self, event: QtGui.QMouseEvent):
-        x, y = event.x(), event.y()
-        if self.image.x() < x < self.image.x() + self.image.width() and \
-                self.image.y() < y < self.image.y() + self.image.height():
-            x -= self.image.x()
-            y -= self.image.y()
-            pos = self.get_gps_cords_by_program_cords((x, y))
-            toponyms = get_toponym_by_cords(pos)
-            if not toponyms:
-                return
-            current_toponym = min(toponyms, key=lambda x: lonlat_distance(pos, tuple(
-                map(float, x['GeoObject']['Point']['pos'].split(' ')))))
-
-            # pprint(toponyms)
-
-            self.image.setFocus()
-            current_toponym = current_toponym['GeoObject']
-            self.current_search_result_toponym = current_toponym
-            self.show_current_toponym_address()
-            cords = get_cords_by_toponym(current_toponym)
-            if cords is not None:
-                # self.map_settings['cords'] = cords
-                # self.map_settings['spn'] = round(max(get_spn_size(current_toponym)), 4)
-                self.map_settings['pt'] = f'{cords[0]},{cords[1]},pm2rdm'
-                self.get_map()
-                self.init_map()
-
-    def btn_map_mode_clicked(self):
-        curr = next(self.map_mode)
-        self.map_settings['map_view'] = curr[1]
-        self.btn_map_mode_change.setText(curr[0])
-        self.get_map()
-        self.init_map()
-
-    def btn_search_submit_clicked(self):
-        self.image.setFocus()
-        search_phrase = self.search_phrase.text()
-        if not search_phrase:
-            self.search_result_address.setText('')
-            self.map_settings['pt'] = ''
-            self.get_map()
-            self.init_map()
-            return
-
-        current_toponym = get_toponym_by_name(search_phrase)
-        self.current_search_result_toponym = current_toponym
-        self.show_current_toponym_address()
-        cords = get_cords_by_toponym(current_toponym)
-        if cords is not None:
-            self.map_settings['cords'] = cords
-            self.map_settings['spn'] = round(max(get_spn_size(current_toponym)), 4)
-            self.map_settings['pt'] = f'{cords[0]},{cords[1]},pm2rdm'
-            self.get_map()
-            self.init_map()
-
-    def btn_search_result_reset_clicked(self):
-        self.current_search_result_toponym = None
-        self.search_result_address.setText('')
-        self.map_settings['pt'] = ''
-        self.get_map()
-        self.init_map()
-
-    def show_current_toponym_address(self):
-        toponym_address = get_address_by_toponym(self.current_search_result_toponym)
-        if toponym_address is None:
-            address = ''
-        else:
-            address = toponym_address['formatted']
-            if self.is_index_show:
-                if 'postal_code' in toponym_address:
-                    address += ', ' + toponym_address['postal_code']
-        self.search_result_address.setText(address)
-
-    def btn_show_index_clicked(self):
-        self.is_index_show = not self.is_index_show
-        self.show_current_toponym_address()
-
-    def get_gps_cords_by_program_cords(self, program_cords):
-        c_x, c_y = self.map_settings['cords']
-        x, y = program_cords
-        dx = x - (self.image.x() + self.image.width() / 2)
-        dy = - y + (self.image.y() + self.image.height() / 2)
-
-        coef_cords = self.map_settings['spn'] / self.image.width()
-
-        new_x = c_x + dx * coef_cords
-        new_y = c_y + dy * coef_cords
-
-        gps_cords = (new_x, new_y)
-        return gps_cords
 
 
 if __name__ == '__main__':
