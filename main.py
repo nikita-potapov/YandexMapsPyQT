@@ -179,6 +179,8 @@ class MainWindow(QWidget):
         self.current_search_result_toponym = None
 
         self.setGeometry(100, 100, *SCREEN_SIZE)
+        self.setMaximumSize(*SCREEN_SIZE)
+        self.setMinimumSize(*SCREEN_SIZE)
         self.setWindowTitle('Отображение карты')
         self.image = QLabel(self)
         self.pixmap = QPixmap()
@@ -307,15 +309,15 @@ class MainWindow(QWidget):
             y -= self.image.y()
             pos = self.get_gps_cords_by_program_cords((x, y))
             toponyms = get_toponym_by_cords(pos)
-            toponyms = sorted(toponyms, key=lambda x: lonlat_distance(pos, tuple(
+            if not toponyms:
+                return
+            current_toponym = min(toponyms, key=lambda x: lonlat_distance(pos, tuple(
                 map(float, x['GeoObject']['Point']['pos'].split(' ')))))
 
             # pprint(toponyms)
 
-            if not toponyms:
-                return
             self.image.setFocus()
-            current_toponym = toponyms[0]['GeoObject']
+            current_toponym = current_toponym['GeoObject']
             self.current_search_result_toponym = current_toponym
             self.show_current_toponym_address()
             cords = get_cords_by_toponym(current_toponym)
