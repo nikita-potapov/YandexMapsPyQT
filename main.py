@@ -15,6 +15,15 @@ SPN = 0.005
 MAP_VIEW = 'map'
 #########################################
 
+
+POINTS = [
+    (40.452111, 93.742111),
+    (32.1499889, -110.8358417),
+    (37.401573, -116.867808),
+    (35.5246, -104.5722778),
+    (-33.8678889, -63.987),
+]
+
 MAP_SPN_COEFFICIENT = 0.05
 MAP_CORDS_COEFFICIENT = 0.005
 
@@ -152,7 +161,6 @@ def check_value(value, min_value, max_value):
     value = max(value, min_value)
     value = min(value, max_value)
     return value
-
 
 
 class MainWindow(QWidget):
